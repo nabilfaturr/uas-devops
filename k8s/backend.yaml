@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uas-todo-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: uas-todo-backend
+  template:
+    metadata:
+      labels:
+        app: uas-todo-backend
+    spec:
+      containers:
+        - name: uas-todo-backend
+          # Pastikan image ini nanti Anda build dan sesuaikan namanya
+          # Untuk lokal minikube: eval $(minikube docker-env) && docker build -t uas-backend ./backend
+          image: uas-backend:latest
+          imagePullPolicy: IfNotPresent # Gunakan image lokal jika ada
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DB_HOST
+              value: "uas-todo-db"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: uas-todo-db-secrets
+                  key: dbname
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: uas-todo-db-secrets
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: uas-todo-db-secrets
+                  key: password
+          # Resources required for HPA
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: uas-todo-backend
+spec:
+  type: NodePort
+  selector:
+    app: uas-todo-backend
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30000 # Fixed port for easier access
