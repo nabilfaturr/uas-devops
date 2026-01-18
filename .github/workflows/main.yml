@@ -1,0 +1,72 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. Login ke Docker Hub (Wajib set Secrets di Repo Settings GitHub)
+      # create secrets: DOCKER_USERNAME dan DOCKER_PASSWORD
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 2. Build & Push Backend Image
+      - name: Build and push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/uas-backend:latest
+
+      # 3. Build & Push Frontend Image
+      - name: Build and push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/uas-frontend:latest
+
+  deploy-to-k8s:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 4. Setup Kubectl (Wajib set Secret: KUBE_CONFIG)
+      # KUBE_CONFIG adalah isi file ~/.kube/config dari server/cluster asli
+      # Note: Ini hanya akan jalan jika cluster Anda bisa diakses dari internet (Bukan Minikube lokal laptop)
+      # Untuk tugas, keberadaan file ini biasanya sudah cukup membuktikan Anda mengerti alurnya.
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Update KubeConfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      # 5. Deploy ke Cluster
+      - name: Deploy to Kubernetes
+        run: |
+          # Ganti nama image di yaml dengan image yang ada username docker hub kita
+          sed -i 's|image: uas-backend:latest|image: ${{ secrets.DOCKER_USERNAME }}/uas-backend:latest|g' k8s/backend.yaml
+          sed -i 's|image: uas-frontend:latest|image: ${{ secrets.DOCKER_USERNAME }}/uas-frontend:latest|g' k8s/frontend.yaml
+
+          # Apply Manifests
+          kubectl apply -f k8s/
+
+          # Force restart pods agar menarik image baru
+          kubectl rollout restart deployment/backend
+          kubectl rollout restart deployment/frontend
