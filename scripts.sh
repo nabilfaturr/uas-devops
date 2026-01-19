@@ -32,5 +32,6 @@ kubectl run -i --tty load-generator \
   --restart=Never -- \
   /bin/sh -c "while sleep 0.01; do wget -q -O- http://uas-todo-backend:3000/health; done"
 
-
  kubectl port-forward svc/uas-todo-backend 3001:3000
+
+ kubectl port-forward -n monitoring svc/monitoring-grafana 3000:80
