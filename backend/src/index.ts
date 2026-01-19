@@ -12,7 +12,7 @@ try {
 const app = new Elysia()
   .use(cors())
   .get("/", () => "Hello from Bun Backend!")
-  .get("/health", () => ({ status: "ok - updated v1.0" }))
+  .get("/health", () => ({ status: "ok - updated v2.0" }))
 
   // GET all todos
   .get("/todos", async () => {
